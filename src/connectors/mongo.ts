@@ -1,0 +1,69 @@
+import { MongoClient, Db } from 'mongodb';
+import type { DbConnector } from './base';
+import type { SchemaIR, TableIR, ColumnIR } from '@/ir/types';
+
+export interface MongoConfig {
+  uri: string;
+  database: string;
+}
+
+/**
+ * MongoConnector, MongoDB'den şema ve veri çekmek için basit bir adaptör.
+ * MongoDB şemasız bir veritabanı olduğundan, şema çıkarımı için örnek dokümanlar kullanılır.
+ */
+export class MongoConnector implements DbConnector {
+  private client: MongoClient;
+  private db?: Db;
+  private config: MongoConfig;
+  constructor(config: MongoConfig) {
+    this.config = config;
+    this.client = new MongoClient(config.uri);
+  }
+  async connect() {
+    await this.client.connect();
+    this.db = this.client.db(this.config.database);
+  }
+  async close() {
+    await this.client.close();
+  }
+  async listTables(): Promise<string[]> {
+    if (!this.db) throw new Error('Not connected');
+    const collections = await this.db.listCollections().toArray();
+    return collections.map((c) => c.name);
+  }
+  async *exportTable(table: string): AsyncGenerator<any> {
+    if (!this.db) throw new Error('Not connected');
+    const cursor = this.db.collection(table).find();
+    for await (const doc of cursor) {
+      yield doc;
+    }
+  }
+  async getSchema(): Promise<SchemaIR> {
+    if (!this.db) throw new Error('Not connected');
+    const collections = await this.listTables();
+    const tableIRs: TableIR[] = [];
+    for (const coll of collections) {
+      // Take sample of first 100 documents to infer keys
+      const cursor = this.db.collection(coll).find().limit(100);
+      const keys = new Set<string>();
+      // gather keys and value types
+      for await (const doc of cursor) {
+        Object.keys(doc).forEach((k) => {
+          if (k !== '_id') keys.add(k);
+        });
+      }
+      const cols: ColumnIR[] = Array.from(keys).map((k) => {
+        // Mongo tipleri map edilmesi için basit bir yaklaşım kullanılır; tüm alanlar varchar veya json gibi saklanır.
+        return {
+          name: k,
+          type: 'json',
+          nullable: true,
+        } as ColumnIR;
+      });
+      // Add _id column as primary key of type uuid or varchar depending on ObjectId
+      cols.unshift({ name: '_id', type: 'varchar', nullable: false });
+      tableIRs.push({ name: coll, columns: cols, primaryKey: { columns: ['_id'] } });
+    }
+    return { dbName: this.config.database, tables: tableIRs };
+  }
+}
