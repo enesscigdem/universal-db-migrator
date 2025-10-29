@@ -1,4 +1,4 @@
-import { Client } from 'pg';
+import 'server-only'
 import type { DbConnector } from './base';
 import type { SchemaIR, TableIR, ColumnIR } from '@/ir/types';
 
@@ -14,19 +14,21 @@ export interface PostgresConfig {
  * PostgresConnector, PostgreSQL veritabanlarından şema ve veri çekmek için adaptör.
  */
 export class PostgresConnector implements DbConnector {
-  private client: Client;
+  private client: any;
   private config: PostgresConfig;
   constructor(config: PostgresConfig) {
     this.config = config;
-    this.client = new Client({
-      host: config.host,
-      port: config.port ?? 5432,
-      user: config.user,
-      password: config.password,
-      database: config.database,
-    });
+    this.client = null;
   }
   async connect() {
+    const { Client } = await import('pg');
+    this.client = new Client({
+      host: this.config.host,
+      port: this.config.port ?? 5432,
+      user: this.config.user,
+      password: this.config.password,
+      database: this.config.database,
+    });
     await this.client.connect();
   }
   async close() {

@@ -1,4 +1,4 @@
-import oracledb from 'oracledb';
+import 'server-only'
 import type { DbConnector } from './base';
 import type { SchemaIR, TableIR, ColumnIR } from '@/ir/types';
 
@@ -13,12 +13,13 @@ export interface OracleConfig {
  * Bu örnek basit bir uygulamadır ve kapsamlı Oracle özelliklerinin tümünü kapsamaz.
  */
 export class OracleConnector implements DbConnector {
-  private connection?: oracledb.Connection;
+  private connection?: any;
   private config: OracleConfig;
   constructor(config: OracleConfig) {
     this.config = config;
   }
   async connect() {
+    const oracledb = (await import('oracledb')).default;
     this.connection = await oracledb.getConnection({
       user: this.config.user,
       password: this.config.password,
@@ -37,6 +38,7 @@ export class OracleConnector implements DbConnector {
   }
   async *exportTable(table: string): AsyncGenerator<any> {
     if (!this.connection) throw new Error('Not connected');
+    const oracledb = (await import('oracledb')).default;
     const result = await this.connection.execute(`SELECT * FROM ${table}`, [], { outFormat: oracledb.OUT_FORMAT_OBJECT });
     if (result.rows) {
       for (const row of result.rows) {
@@ -53,7 +55,7 @@ export class OracleConnector implements DbConnector {
         `SELECT column_name, data_type, data_length, data_precision, data_scale, nullable, data_default
          FROM user_tab_columns WHERE table_name = :tbl ORDER BY column_id`,
         [table],
-        { outFormat: oracledb.OUT_FORMAT_OBJECT },
+        { outFormat: (await import('oracledb')).default.OUT_FORMAT_OBJECT },
       );
       const cols: ColumnIR[] = [];
       if (colRes.rows) {
@@ -117,7 +119,7 @@ export class OracleConnector implements DbConnector {
             AND cons.constraint_name = cols.constraint_name
             AND cons.table_name = :tbl`,
         [table],
-        { outFormat: oracledb.OUT_FORMAT_OBJECT },
+        { outFormat: (await import('oracledb')).default.OUT_FORMAT_OBJECT },
       );
       const pkCols: string[] = pkRes.rows ? pkRes.rows.map((r: any) => r.COLUMN_NAME as string) : [];
       tableIRs.push({ name: table, columns: cols, primaryKey: pkCols.length > 0 ? { columns: pkCols } : undefined });

@@ -1,4 +1,4 @@
-import { MongoClient, Db } from 'mongodb';
+import 'server-only'
 import type { DbConnector } from './base';
 import type { SchemaIR, TableIR, ColumnIR } from '@/ir/types';
 
@@ -12,14 +12,17 @@ export interface MongoConfig {
  * MongoDB şemasız bir veritabanı olduğundan, şema çıkarımı için örnek dokümanlar kullanılır.
  */
 export class MongoConnector implements DbConnector {
-  private client: MongoClient;
-  private db?: Db;
+  private client: any;
+  private db?: any;
   private config: MongoConfig;
   constructor(config: MongoConfig) {
     this.config = config;
-    this.client = new MongoClient(config.uri);
+    // Defer driver load to runtime to avoid bundling error if dependency is missing
+    this.client = null;
   }
   async connect() {
+    const { MongoClient } = await import('mongodb');
+    this.client = new MongoClient(this.config.uri);
     await this.client.connect();
     this.db = this.client.db(this.config.database);
   }
@@ -28,8 +31,10 @@ export class MongoConnector implements DbConnector {
   }
   async listTables(): Promise<string[]> {
     if (!this.db) throw new Error('Not connected');
-    const collections = await this.db.listCollections().toArray();
-    return collections.map((c) => c.name);
+    const collections = (await this.db
+      .listCollections()
+      .toArray()) as Array<{ name: string }>;
+    return collections.map((c: { name: string }) => c.name);
   }
   async *exportTable(table: string): AsyncGenerator<any> {
     if (!this.db) throw new Error('Not connected');

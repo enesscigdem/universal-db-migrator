@@ -27,19 +27,19 @@ interface MigrationResponse {
 
 type DbType = "mysql" | "postgresql" | "mssql" | "mongodb" | "oracle"
 
-const defaultDbFields: Record<DbType, () => any> = {
-  mysql: () => ({ host: "", port: "3306", user: "", password: "", database: "" }),
-  postgresql: () => ({ host: "", port: "5432", user: "", password: "", database: "" }),
-  mssql: () => ({
+const defaultDbFields = {
+  mysql: { host: "", port: "3306", user: "", password: "", database: "" },
+  postgresql: { host: "", port: "5432", user: "", password: "", database: "" },
+  mssql: {
     server: "",
     port: "1433",
     user: "",
     password: "",
     database: "",
     encrypt: false,
-  }),
-  mongodb: () => ({ uri: "", database: "" }),
-  oracle: () => ({ user: "", password: "", connectString: "" }),
+  },
+  mongodb: { uri: "", database: "" },
+  oracle: { user: "", password: "", connectString: "" },
 }
 
 const dbIcons: Record<DbType, string> = {
@@ -62,31 +62,25 @@ export default function HomePage() {
   const [step, setStep] = useState(1)
   const [sourceType, setSourceType] = useState<DbType>("mysql")
   const [targetType, setTargetType] = useState<DbType>("mssql")
-  const [fields, setFields] = useState<any>(defaultDbFields["mysql"]())
+  const [fields, setFields] = useState<any>(defaultDbFields["mysql"])
   const [status, setStatus] = useState<string>("")
   const [downloadUrl, setDownloadUrl] = useState<string>("")
   const [error, setError] = useState<string>("")
   const [isProcessing, setIsProcessing] = useState(false)
   const [connectionTested, setConnectionTested] = useState(false)
   const [testingConnection, setTestingConnection] = useState(false)
-  const [connectionStatus, setConnectionStatus] = useState<"idle" | "success" | "error">("idle")
+  const [connectionStatus, setConnectionStatus] = useState<"success" | "error" | "">("")
   const [connectionMessage, setConnectionMessage] = useState<string>("")
-
-  const resetConnectionFeedback = () => {
-    setConnectionTested(false)
-    setConnectionStatus("idle")
-    setConnectionMessage("")
-  }
 
   const handleSourceTypeChange = (type: DbType) => {
     setSourceType(type)
-    setFields(defaultDbFields[type]())
-    resetConnectionFeedback()
+    setFields(defaultDbFields[type])
+    setConnectionTested(false)
   }
 
   const handleFieldChange = (field: string, value: string | boolean) => {
     setFields((prev: any) => ({ ...prev, [field]: value }))
-    resetConnectionFeedback()
+    setConnectionTested(false)
   }
 
   const handleSample = () => {
@@ -114,32 +108,69 @@ export default function HomePage() {
         setFields({ user: "system", password: "oracle", connectString: "localhost/XEPDB1" })
         break
     }
-    resetConnectionFeedback()
   }
 
   const testConnection = async () => {
     setTestingConnection(true)
-    setConnectionStatus("idle")
-    setConnectionMessage("")
-    setConnectionTested(false)
     setError("")
+    setConnectionMessage("")
+
+    const cfg = getConfigObj()
+    const missing: string[] = []
+    switch (sourceType) {
+      case "mysql":
+      case "postgresql": {
+        if (!cfg.host) missing.push("host")
+        if (!cfg.port) missing.push("port")
+        if (!cfg.user) missing.push("user")
+        if (!cfg.database) missing.push("database")
+        break
+      }
+      case "mssql": {
+        if (!cfg.server) missing.push("server")
+        if (!cfg.port) missing.push("port")
+        if (!cfg.user) missing.push("user")
+        if (!cfg.database) missing.push("database")
+        break
+      }
+      case "mongodb": {
+        if (!cfg.uri) missing.push("uri")
+        if (!cfg.database) missing.push("database")
+        break
+      }
+      case "oracle": {
+        if (!cfg.user) missing.push("user")
+        if (!cfg.password) missing.push("password")
+        if (!cfg.connectString) missing.push("connectString")
+        break
+      }
+    }
+
+    if (missing.length) {
+      setConnectionStatus("error")
+      setConnectionMessage(`Eksik alanlar: ${missing.join(", ")}`)
+      setTestingConnection(false)
+      setConnectionTested(false)
+      return
+    }
+
     try {
-      const configObj = getConfigObj()
       const res = await fetch("/api/test-connection", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type: sourceType, config: configObj }),
+        body: JSON.stringify({ type: sourceType, config: cfg }),
       })
       const data = await res.json()
       if (!res.ok || data.error) {
-        throw new Error(data.error || "Bağlantı testi başarısız oldu.")
+        throw new Error(data.error || "Bağlantı başarısız")
       }
-      setConnectionTested(true)
       setConnectionStatus("success")
-      setConnectionMessage(data.message || "Bağlantı başarıyla doğrulandı.")
-    } catch (err: any) {
+      setConnectionMessage(data.message || "Bağlantı başarılı")
+      setConnectionTested(true)
+    } catch (e: any) {
       setConnectionStatus("error")
-      setConnectionMessage(err.message || "Bağlantı testi gerçekleştirilemedi.")
+      setConnectionMessage(e.message || "Bağlantı kurulamadı")
+      setConnectionTested(false)
     } finally {
       setTestingConnection(false)
     }
@@ -176,12 +207,6 @@ export default function HomePage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!connectionTested) {
-      setConnectionStatus("error")
-      setConnectionMessage("Dönüştürmeye başlamadan önce bağlantıyı test edin.")
-      setStep(2)
-      return
-    }
     setIsProcessing(true)
     setStatus("Dönüştürme işlemi başlatılıyor...")
     setError("")
@@ -547,7 +572,7 @@ export default function HomePage() {
                       type="button"
                       onClick={testConnection}
                       disabled={testingConnection}
-                      className="px-4 py-2 bg-secondary border border-border rounded-lg text-sm font-medium hover:bg-secondary/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                      className="px-4 py-2 bg-secondary border border-border rounded-lg text-sm font-medium hover:bg-secondary/80 transition-colors disabled:opacity-50 flex items-center gap-2"
                     >
                       {testingConnection ? (
                         <>
@@ -564,18 +589,18 @@ export default function HomePage() {
                       )}
                     </button>
                   </div>
-                  {connectionStatus === "success" && connectionMessage ? (
-                    <p className="mt-3 flex items-center gap-2 text-sm text-success">
-                      <CheckCircle2 className="w-4 h-4" />
+                  {connectionStatus === "success" && (
+                    <div className="mt-4 p-3 bg-success/20 rounded-lg border border-success/30 text-success text-sm">
+                      <CheckCircle2 className="w-4 h-4 mr-2" />
                       {connectionMessage}
-                    </p>
-                  ) : null}
-                  {connectionStatus === "error" && connectionMessage ? (
-                    <p className="mt-3 flex items-start gap-2 text-sm text-destructive">
-                      <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                      <span>{connectionMessage}</span>
-                    </p>
-                  ) : null}
+                    </div>
+                  )}
+                  {connectionStatus === "error" && (
+                    <div className="mt-4 p-3 bg-destructive/20 rounded-lg border border-destructive/30 text-destructive text-sm">
+                      <AlertCircle className="w-4 h-4 mr-2" />
+                      {connectionMessage}
+                    </div>
+                  )}
                 </div>
 
                 <div className="mt-6 flex justify-between">
@@ -589,8 +614,7 @@ export default function HomePage() {
                   <button
                     type="button"
                     onClick={() => setStep(3)}
-                    disabled={!connectionTested}
-                    className="px-6 py-3 bg-primary text-primary-foreground rounded-lg font-medium hover:bg-primary/90 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="px-6 py-3 bg-primary text-primary-foreground rounded-lg font-medium hover:bg-primary/90 transition-colors flex items-center gap-2"
                   >
                     Devam Et
                     <ChevronRight className="w-4 h-4" />
@@ -654,8 +678,8 @@ export default function HomePage() {
                   </button>
                   <button
                     type="submit"
-                    disabled={!connectionTested || isProcessing}
-                    className="px-6 py-3 bg-gradient-to-r from-primary to-accent text-primary-foreground rounded-lg font-medium hover:opacity-90 transition-all flex items-center gap-2 shadow-lg shadow-primary/30 disabled:opacity-60 disabled:cursor-not-allowed"
+                    disabled={isProcessing}
+                    className="px-6 py-3 bg-gradient-to-r from-primary to-accent text-primary-foreground rounded-lg font-medium hover:opacity-90 transition-all flex items-center gap-2 shadow-lg shadow-primary/30"
                   >
                     {isProcessing ? (
                       <>
@@ -739,7 +763,7 @@ export default function HomePage() {
                         setStep(1)
                         setDownloadUrl("")
                         setStatus("")
-                        resetConnectionFeedback()
+                        setConnectionTested(false)
                       }}
                       className="mt-6 text-primary hover:text-primary/80 transition-colors text-sm font-medium"
                     >
@@ -759,7 +783,6 @@ export default function HomePage() {
                       onClick={() => {
                         setStep(2)
                         setError("")
-                        resetConnectionFeedback()
                       }}
                       className="px-6 py-3 bg-primary text-primary-foreground rounded-lg font-medium hover:bg-primary/90 transition-colors"
                     >
@@ -803,7 +826,7 @@ export default function HomePage() {
       </main>
 
       {/* Footer */}
-      <footer className="mt-auto border-t border-border bg-card/30 backdrop-blur-xl">
+      <footer className="fixed bottom-0 left-0 right-0 z-50 w-full border-t border-border bg-card/30 backdrop-blur-xl">
         <div className="container mx-auto px-4 py-6">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             <p className="text-sm text-muted-foreground">

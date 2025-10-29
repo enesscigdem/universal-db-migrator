@@ -1,3 +1,4 @@
+import 'server-only'
 import { createWriteStream } from 'fs';
 import archiver from 'archiver';
 
@@ -11,7 +12,7 @@ export async function createZip(outputPath: string, files: { name: string; conte
     const output = createWriteStream(outputPath);
     const archive = archiver('zip', { zlib: { level: 9 } });
     output.on('close', () => resolve());
-    archive.on('error', (err) => reject(err));
+    archive.on('error', (err: unknown) => reject(err));
     archive.pipe(output);
     for (const file of files) {
       archive.append(file.content, { name: file.name });

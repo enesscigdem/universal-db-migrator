@@ -1,4 +1,4 @@
-import * as mssql from 'mssql';
+import 'server-only'
 import type { DbConnector } from './base';
 import type { SchemaIR, TableIR, ColumnIR } from '@/ir/types';
 
@@ -15,12 +15,13 @@ export interface MSSQLConfig {
  * MSSQLConnector, Microsoft SQL Server veritabanlarından şema ve veri çekmek için adaptör.
  */
 export class MSSQLConnector implements DbConnector {
-  private pool?: mssql.ConnectionPool;
+  private pool?: any;
   private config: MSSQLConfig;
   constructor(config: MSSQLConfig) {
     this.config = config;
   }
   async connect() {
+    const mssql = await import('mssql');
     this.pool = await mssql.connect({
       user: this.config.user,
       password: this.config.password,
@@ -52,10 +53,11 @@ export class MSSQLConnector implements DbConnector {
   }
   async getSchema(): Promise<SchemaIR> {
     if (!this.pool) throw new Error('Not connected');
+    const mssqlLib = await import('mssql');
     const tables = await this.listTables();
     const tableIRs: TableIR[] = [];
     for (const table of tables) {
-      const colsRes = await this.pool.request().input('table', mssql.VarChar, table).query(
+      const colsRes = await this.pool.request().input('table', mssqlLib.VarChar, table).query(
         `SELECT COLUMN_NAME, DATA_TYPE, CHARACTER_MAXIMUM_LENGTH, NUMERIC_PRECISION, NUMERIC_SCALE, IS_NULLABLE, COLUMN_DEFAULT, COLUMNPROPERTY(object_id(TABLE_SCHEMA+'.'+TABLE_NAME), COLUMN_NAME, 'IsIdentity') AS IsIdentity
          FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = @table ORDER BY ORDINAL_POSITION`,
       );
@@ -126,7 +128,7 @@ export class MSSQLConnector implements DbConnector {
         } as ColumnIR;
       });
       // primary keys
-      const pkRes = await this.pool.request().input('table', mssql.VarChar, table).query(
+      const pkRes = await this.pool.request().input('table', mssqlLib.VarChar, table).query(
         `SELECT k.COLUMN_NAME
          FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS t
          JOIN INFORMATION_SCHEMA.KEY_COLUMN_USAGE k

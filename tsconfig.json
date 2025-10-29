@@ -38,6 +38,10 @@
         "./src/app/api/*"
       ]
     },
+    "typeRoots": [
+      "./src/types",
+      "./node_modules/@types"
+    ],
     "plugins": [
       {
         "name": "next"

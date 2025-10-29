@@ -1,4 +1,4 @@
-import { createPool, Pool, RowDataPacket } from 'mysql2/promise';
+import 'server-only'
 import type { DbConnector } from './base';
 import type { SchemaIR, TableIR, ColumnIR } from '@/ir/types';
 
@@ -16,30 +16,32 @@ export interface MySQLConfig {
  * ve şema bilgisini IR formatına dönüştürebilir. Detaylı tip dönüşümleri en yaygın tipleri kapsar.
  */
 export class MySQLConnector implements DbConnector {
-  private pool: Pool;
+  private pool: any;
   private config: MySQLConfig;
   constructor(config: MySQLConfig) {
     this.config = config;
-    this.pool = createPool({
-      host: config.host,
-      port: config.port ?? 3306,
-      user: config.user,
-      password: config.password,
-      database: config.database,
-      waitForConnections: true,
-    });
+    this.pool = null;
   }
   /**
    * Bağlantıyı doğrular. createPool lazily bağlanır, bu yüzden basit bir sorgu atılır.
    */
   async connect() {
+    const { createPool } = await import('mysql2/promise');
+    this.pool = createPool({
+      host: this.config.host,
+      port: this.config.port ?? 3306,
+      user: this.config.user,
+      password: this.config.password,
+      database: this.config.database,
+      waitForConnections: true,
+    });
     await this.pool.query('SELECT 1');
   }
   async close() {
     await this.pool.end();
   }
   async listTables(): Promise<string[]> {
-    const [rows] = await this.pool.query<RowDataPacket[]>(
+    const [rows] = await this.pool.query(
       'SELECT table_name FROM information_schema.tables WHERE table_schema = ? AND table_type = \"BASE TABLE\"',
       [this.config.database],
     );
@@ -48,7 +50,7 @@ export class MySQLConnector implements DbConnector {
   async *exportTable(table: string): AsyncGenerator<any> {
     // Veriyi bellek taşmasına izin vermeden satır satır yield etmek için cursor kullanmak gerekir.
     // mysql2/promise kütüphanesi cursor desteği sunmadığından basit bir sorgu üzerinden tüm sonuç döndürülür.
-    const [rows] = await this.pool.query<RowDataPacket[]>(`SELECT * FROM ${table}`);
+    const [rows] = await this.pool.query(`SELECT * FROM ${table}`);
     for (const row of rows) {
       yield row;
     }
@@ -57,7 +59,7 @@ export class MySQLConnector implements DbConnector {
     const tables = await this.listTables();
     const tableIRs: TableIR[] = [];
     for (const table of tables) {
-      const [columns] = await this.pool.query<RowDataPacket[]>(
+      const [columns] = await this.pool.query(
         `SELECT COLUMN_NAME AS name, DATA_TYPE AS dataType, CHARACTER_MAXIMUM_LENGTH AS charMaxLength, NUMERIC_PRECISION AS numericPrecision, NUMERIC_SCALE AS numericScale, IS_NULLABLE AS isNullable, COLUMN_DEFAULT AS defaultValue, COLUMN_KEY AS columnKey, EXTRA AS extra
          FROM information_schema.columns
          WHERE table_schema = ? AND table_name = ?

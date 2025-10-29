@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createConnector } from '@/connectors'
+import { createConnector } from '../../../connectors'
 import type { DbConnector } from '@/connectors/base'
 
 export async function POST(req: NextRequest) {
