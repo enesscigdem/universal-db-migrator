@@ -1,9 +1,9 @@
 import type { DbConnector } from './base';
-import { MySQLConnector, MySQLConfig } from './mysql';
-import { PostgresConnector, PostgresConfig } from './postgres';
-import { MSSQLConnector, MSSQLConfig } from './mssql';
-import { MongoConnector, MongoConfig } from './mongo';
-import { OracleConnector, OracleConfig } from './oracle';
+import type { MySQLConfig } from './mysql';
+import type { PostgresConfig } from './postgres';
+import type { MSSQLConfig } from './mssql';
+import type { MongoConfig } from './mongo';
+import type { OracleConfig } from './oracle';
 
 export type ConnectorType = 'mysql' | 'postgresql' | 'mssql' | 'mongodb' | 'oracle';
 
@@ -12,18 +12,28 @@ export interface ConnectorParams {
   config: any;
 }
 
-export function createConnector(params: ConnectorParams): DbConnector {
+export async function createConnector(params: ConnectorParams): Promise<DbConnector> {
   switch (params.type) {
-    case 'mysql':
+    case 'mysql': {
+      const { MySQLConnector } = await import('./mysql');
       return new MySQLConnector(params.config as MySQLConfig);
-    case 'postgresql':
+    }
+    case 'postgresql': {
+      const { PostgresConnector } = await import('./postgres');
       return new PostgresConnector(params.config as PostgresConfig);
-    case 'mssql':
+    }
+    case 'mssql': {
+      const { MSSQLConnector } = await import('./mssql');
       return new MSSQLConnector(params.config as MSSQLConfig);
-    case 'mongodb':
+    }
+    case 'mongodb': {
+      const { MongoConnector } = await import('./mongo');
       return new MongoConnector(params.config as MongoConfig);
-    case 'oracle':
+    }
+    case 'oracle': {
+      const { OracleConnector } = await import('./oracle');
       return new OracleConnector(params.config as OracleConfig);
+    }
     default:
       throw new Error(`Unsupported connector type: ${params.type}`);
   }

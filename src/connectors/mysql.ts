@@ -26,7 +26,15 @@ export class MySQLConnector implements DbConnector {
    * Bağlantıyı doğrular. createPool lazily bağlanır, bu yüzden basit bir sorgu atılır.
    */
   async connect() {
-    const { createPool } = await import('mysql2/promise');
+    let mysqlModule: any;
+    try {
+      mysqlModule = await import('mysql2/promise');
+    } catch (err: any) {
+      const help = 'MySQL sürücüsü bulunamadı. Lütfen `npm install mysql2` komutunu çalıştırın.';
+      err.message = `${help} Ayrıntı: ${err.message}`;
+      throw err;
+    }
+    const { createPool } = mysqlModule;
     this.pool = createPool({
       host: this.config.host,
       port: this.config.port ?? 3306,

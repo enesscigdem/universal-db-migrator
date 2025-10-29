@@ -21,7 +21,15 @@ export class PostgresConnector implements DbConnector {
     this.client = null;
   }
   async connect() {
-    const { Client } = await import('pg');
+    let pgModule: any;
+    try {
+      pgModule = await import('pg');
+    } catch (err: any) {
+      const help = 'PostgreSQL sürücüsü bulunamadı. Lütfen `npm install pg` komutunu çalıştırın.';
+      err.message = `${help} Ayrıntı: ${err.message}`;
+      throw err;
+    }
+    const { Client } = pgModule;
     this.client = new Client({
       host: this.config.host,
       port: this.config.port ?? 5432,

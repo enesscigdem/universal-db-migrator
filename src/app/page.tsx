@@ -96,8 +96,8 @@ export default function HomePage() {
           server: "localhost",
           port: "1433",
           user: "sa",
-          password: "password",
-          database: "mydb",
+          password: "reallyStrongPwd123",
+          database: "SqlTraining",
           encrypt: false,
         })
         break
@@ -245,7 +245,7 @@ export default function HomePage() {
                 <Database className="w-6 h-6 text-primary-foreground" />
               </div>
               <div>
-                <h1 className="text-xl font-bold text-balance">DataFlow Pro</h1>
+                <h1 className="text-xl font-bold text-balance">DB Converter</h1>
                 <p className="text-xs text-muted-foreground">Veritabanı Geçiş Platformu</p>
               </div>
             </div>
@@ -830,7 +830,7 @@ export default function HomePage() {
         <div className="container mx-auto px-4 py-6">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             <p className="text-sm text-muted-foreground">
-              &copy; {new Date().getFullYear()} DataFlow Pro. Tüm hakları saklıdır.
+              &copy; {new Date().getFullYear()} DB Converter. Tüm hakları saklıdır.
             </p>
             <div className="flex items-center gap-6 text-sm text-muted-foreground">
               <a href="#" className="hover:text-foreground transition-colors">

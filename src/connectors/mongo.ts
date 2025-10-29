@@ -21,7 +21,15 @@ export class MongoConnector implements DbConnector {
     this.client = null;
   }
   async connect() {
-    const { MongoClient } = await import('mongodb');
+    let mongoModule: any;
+    try {
+      mongoModule = await import('mongodb');
+    } catch (err: any) {
+      const help = 'MongoDB sürücüsü bulunamadı. Lütfen `npm install mongodb` komutunu çalıştırın.';
+      err.message = `${help} Ayrıntı: ${err.message}`;
+      throw err;
+    }
+    const { MongoClient } = mongoModule;
     this.client = new MongoClient(this.config.uri);
     await this.client.connect();
     this.db = this.client.db(this.config.database);

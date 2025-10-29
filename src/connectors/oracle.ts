@@ -19,7 +19,15 @@ export class OracleConnector implements DbConnector {
     this.config = config;
   }
   async connect() {
-    const oracledb = (await import('oracledb')).default;
+    let oracledbModule: any;
+    try {
+      oracledbModule = await import('oracledb');
+    } catch (err: any) {
+      const help = 'Oracle sürücüsü bulunamadı. Lütfen `npm install oracledb` komutunu çalıştırın (yerel bağımlılıklar gerektirir).';
+      err.message = `${help} Ayrıntı: ${err.message}`;
+      throw err;
+    }
+    const oracledb = (oracledbModule as any).default ?? oracledbModule;
     this.connection = await oracledb.getConnection({
       user: this.config.user,
       password: this.config.password,
@@ -38,7 +46,15 @@ export class OracleConnector implements DbConnector {
   }
   async *exportTable(table: string): AsyncGenerator<any> {
     if (!this.connection) throw new Error('Not connected');
-    const oracledb = (await import('oracledb')).default;
+    let oracledbModule: any;
+    try {
+      oracledbModule = await import('oracledb');
+    } catch (err: any) {
+      const help = 'Oracle sürücüsü bulunamadı. Lütfen `npm install oracledb` komutunu çalıştırın (yerel bağımlılıklar gerektirir).';
+      err.message = `${help} Ayrıntı: ${err.message}`;
+      throw err;
+    }
+    const oracledb = (oracledbModule as any).default ?? oracledbModule;
     const result = await this.connection.execute(`SELECT * FROM ${table}`, [], { outFormat: oracledb.OUT_FORMAT_OBJECT });
     if (result.rows) {
       for (const row of result.rows) {
@@ -48,6 +64,15 @@ export class OracleConnector implements DbConnector {
   }
   async getSchema(): Promise<SchemaIR> {
     if (!this.connection) throw new Error('Not connected');
+    let oracledbModule: any;
+    try {
+      oracledbModule = await import('oracledb');
+    } catch (err: any) {
+      const help = 'Oracle sürücüsü bulunamadı. Lütfen `npm install oracledb` komutunu çalıştırın (yerel bağımlılıklar gerektirir).';
+      err.message = `${help} Ayrıntı: ${err.message}`;
+      throw err;
+    }
+    const oracledb = (oracledbModule as any).default ?? oracledbModule;
     const tables = await this.listTables();
     const tableIRs: TableIR[] = [];
     for (const table of tables) {
@@ -55,7 +80,7 @@ export class OracleConnector implements DbConnector {
         `SELECT column_name, data_type, data_length, data_precision, data_scale, nullable, data_default
          FROM user_tab_columns WHERE table_name = :tbl ORDER BY column_id`,
         [table],
-        { outFormat: (await import('oracledb')).default.OUT_FORMAT_OBJECT },
+        { outFormat: oracledb.OUT_FORMAT_OBJECT },
       );
       const cols: ColumnIR[] = [];
       if (colRes.rows) {
@@ -115,11 +140,11 @@ export class OracleConnector implements DbConnector {
       const pkRes = await this.connection.execute(
         `SELECT cols.column_name
            FROM user_constraints cons, user_cons_columns cols
-          WHERE cons.constraint_type = 'P'
-            AND cons.constraint_name = cols.constraint_name
-            AND cons.table_name = :tbl`,
+         WHERE cons.constraint_type = 'P'
+           AND cons.constraint_name = cols.constraint_name
+           AND cons.table_name = :tbl`,
         [table],
-        { outFormat: (await import('oracledb')).default.OUT_FORMAT_OBJECT },
+        { outFormat: oracledb.OUT_FORMAT_OBJECT },
       );
       const pkCols: string[] = pkRes.rows ? pkRes.rows.map((r: any) => r.COLUMN_NAME as string) : [];
       tableIRs.push({ name: table, columns: cols, primaryKey: pkCols.length > 0 ? { columns: pkCols } : undefined });

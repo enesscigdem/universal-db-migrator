@@ -21,7 +21,14 @@ export class MSSQLConnector implements DbConnector {
     this.config = config;
   }
   async connect() {
-    const mssql = await import('mssql');
+    let mssql: any;
+    try {
+      mssql = await import('mssql');
+    } catch (err: any) {
+      const help = 'MSSQL sürücüsü bulunamadı. Lütfen `npm install mssql` komutunu çalıştırın.';
+      err.message = `${help} Ayrıntı: ${err.message}`;
+      throw err;
+    }
     this.pool = await mssql.connect({
       user: this.config.user,
       password: this.config.password,
@@ -53,7 +60,14 @@ export class MSSQLConnector implements DbConnector {
   }
   async getSchema(): Promise<SchemaIR> {
     if (!this.pool) throw new Error('Not connected');
-    const mssqlLib = await import('mssql');
+    let mssqlLib: any;
+    try {
+      mssqlLib = await import('mssql');
+    } catch (err: any) {
+      const help = 'MSSQL sürücüsü bulunamadı. Lütfen `npm install mssql` komutunu çalıştırın.';
+      err.message = `${help} Ayrıntı: ${err.message}`;
+      throw err;
+    }
     const tables = await this.listTables();
     const tableIRs: TableIR[] = [];
     for (const table of tables) {

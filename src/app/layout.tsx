@@ -5,7 +5,7 @@ import { Inter } from "next/font/google"
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata = {
-  title: "DataFlow Pro - Veritabanı Dönüştürücü",
+  title: "Veritabanı Dönüştürücü",
   description: "Profesyonel veritabanı geçiş ve dönüştürme platformu",
 }
 

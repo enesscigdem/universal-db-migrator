@@ -10,7 +10,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Veritabanı türü ve yapılandırması gerekli.' }, { status: 400 })
     }
 
-    connector = createConnector({ type, config })
+    connector = await createConnector({ type, config })
     await connector.connect()
 
     return NextResponse.json({ success: true, message: 'Bağlantı başarıyla doğrulandı.' })

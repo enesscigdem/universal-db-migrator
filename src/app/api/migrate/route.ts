@@ -17,7 +17,7 @@ export async function POST(req: NextRequest) {
     if (!source || !target) {
       return NextResponse.json({ error: 'Geçersiz parametreler' }, { status: 400 });
     }
-    const srcConnector = createConnector({ type: source.type, config: source.config });
+    const srcConnector = await createConnector({ type: source.type, config: source.config });
     await srcConnector.connect();
     const schema = await srcConnector.getSchema();
     // Create DDL for target
