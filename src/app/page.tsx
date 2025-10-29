@@ -27,19 +27,19 @@ interface MigrationResponse {
 
 type DbType = "mysql" | "postgresql" | "mssql" | "mongodb" | "oracle"
 
-const defaultDbFields = {
-  mysql: { host: "", port: "3306", user: "", password: "", database: "" },
-  postgresql: { host: "", port: "5432", user: "", password: "", database: "" },
-  mssql: {
+const defaultDbFields: Record<DbType, () => any> = {
+  mysql: () => ({ host: "", port: "3306", user: "", password: "", database: "" }),
+  postgresql: () => ({ host: "", port: "5432", user: "", password: "", database: "" }),
+  mssql: () => ({
     server: "",
     port: "1433",
     user: "",
     password: "",
     database: "",
     encrypt: false,
-  },
-  mongodb: { uri: "", database: "" },
-  oracle: { user: "", password: "", connectString: "" },
+  }),
+  mongodb: () => ({ uri: "", database: "" }),
+  oracle: () => ({ user: "", password: "", connectString: "" }),
 }
 
 const dbIcons: Record<DbType, string> = {
@@ -62,23 +62,31 @@ export default function HomePage() {
   const [step, setStep] = useState(1)
   const [sourceType, setSourceType] = useState<DbType>("mysql")
   const [targetType, setTargetType] = useState<DbType>("mssql")
-  const [fields, setFields] = useState<any>(defaultDbFields["mysql"])
+  const [fields, setFields] = useState<any>(defaultDbFields["mysql"]())
   const [status, setStatus] = useState<string>("")
   const [downloadUrl, setDownloadUrl] = useState<string>("")
   const [error, setError] = useState<string>("")
   const [isProcessing, setIsProcessing] = useState(false)
   const [connectionTested, setConnectionTested] = useState(false)
   const [testingConnection, setTestingConnection] = useState(false)
+  const [connectionStatus, setConnectionStatus] = useState<"idle" | "success" | "error">("idle")
+  const [connectionMessage, setConnectionMessage] = useState<string>("")
+
+  const resetConnectionFeedback = () => {
+    setConnectionTested(false)
+    setConnectionStatus("idle")
+    setConnectionMessage("")
+  }
 
   const handleSourceTypeChange = (type: DbType) => {
     setSourceType(type)
-    setFields(defaultDbFields[type])
-    setConnectionTested(false)
+    setFields(defaultDbFields[type]())
+    resetConnectionFeedback()
   }
 
   const handleFieldChange = (field: string, value: string | boolean) => {
     setFields((prev: any) => ({ ...prev, [field]: value }))
-    setConnectionTested(false)
+    resetConnectionFeedback()
   }
 
   const handleSample = () => {
@@ -106,15 +114,35 @@ export default function HomePage() {
         setFields({ user: "system", password: "oracle", connectString: "localhost/XEPDB1" })
         break
     }
+    resetConnectionFeedback()
   }
 
   const testConnection = async () => {
     setTestingConnection(true)
+    setConnectionStatus("idle")
+    setConnectionMessage("")
+    setConnectionTested(false)
     setError("")
-    // Simulated connection test
-    await new Promise((resolve) => setTimeout(resolve, 1500))
-    setTestingConnection(false)
-    setConnectionTested(true)
+    try {
+      const configObj = getConfigObj()
+      const res = await fetch("/api/test-connection", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: sourceType, config: configObj }),
+      })
+      const data = await res.json()
+      if (!res.ok || data.error) {
+        throw new Error(data.error || "Bağlantı testi başarısız oldu.")
+      }
+      setConnectionTested(true)
+      setConnectionStatus("success")
+      setConnectionMessage(data.message || "Bağlantı başarıyla doğrulandı.")
+    } catch (err: any) {
+      setConnectionStatus("error")
+      setConnectionMessage(err.message || "Bağlantı testi gerçekleştirilemedi.")
+    } finally {
+      setTestingConnection(false)
+    }
   }
 
   const getConfigObj = () => {
@@ -148,6 +176,12 @@ export default function HomePage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!connectionTested) {
+      setConnectionStatus("error")
+      setConnectionMessage("Dönüştürmeye başlamadan önce bağlantıyı test edin.")
+      setStep(2)
+      return
+    }
     setIsProcessing(true)
     setStatus("Dönüştürme işlemi başlatılıyor...")
     setError("")
@@ -513,7 +547,7 @@ export default function HomePage() {
                       type="button"
                       onClick={testConnection}
                       disabled={testingConnection}
-                      className="px-4 py-2 bg-secondary border border-border rounded-lg text-sm font-medium hover:bg-secondary/80 transition-colors disabled:opacity-50 flex items-center gap-2"
+                      className="px-4 py-2 bg-secondary border border-border rounded-lg text-sm font-medium hover:bg-secondary/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                     >
                       {testingConnection ? (
                         <>
@@ -530,6 +564,18 @@ export default function HomePage() {
                       )}
                     </button>
                   </div>
+                  {connectionStatus === "success" && connectionMessage ? (
+                    <p className="mt-3 flex items-center gap-2 text-sm text-success">
+                      <CheckCircle2 className="w-4 h-4" />
+                      {connectionMessage}
+                    </p>
+                  ) : null}
+                  {connectionStatus === "error" && connectionMessage ? (
+                    <p className="mt-3 flex items-start gap-2 text-sm text-destructive">
+                      <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                      <span>{connectionMessage}</span>
+                    </p>
+                  ) : null}
                 </div>
 
                 <div className="mt-6 flex justify-between">
@@ -543,7 +589,8 @@ export default function HomePage() {
                   <button
                     type="button"
                     onClick={() => setStep(3)}
-                    className="px-6 py-3 bg-primary text-primary-foreground rounded-lg font-medium hover:bg-primary/90 transition-colors flex items-center gap-2"
+                    disabled={!connectionTested}
+                    className="px-6 py-3 bg-primary text-primary-foreground rounded-lg font-medium hover:bg-primary/90 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Devam Et
                     <ChevronRight className="w-4 h-4" />
@@ -607,8 +654,8 @@ export default function HomePage() {
                   </button>
                   <button
                     type="submit"
-                    disabled={isProcessing}
-                    className="px-6 py-3 bg-gradient-to-r from-primary to-accent text-primary-foreground rounded-lg font-medium hover:opacity-90 transition-all flex items-center gap-2 shadow-lg shadow-primary/30"
+                    disabled={!connectionTested || isProcessing}
+                    className="px-6 py-3 bg-gradient-to-r from-primary to-accent text-primary-foreground rounded-lg font-medium hover:opacity-90 transition-all flex items-center gap-2 shadow-lg shadow-primary/30 disabled:opacity-60 disabled:cursor-not-allowed"
                   >
                     {isProcessing ? (
                       <>
@@ -692,7 +739,7 @@ export default function HomePage() {
                         setStep(1)
                         setDownloadUrl("")
                         setStatus("")
-                        setConnectionTested(false)
+                        resetConnectionFeedback()
                       }}
                       className="mt-6 text-primary hover:text-primary/80 transition-colors text-sm font-medium"
                     >
@@ -712,6 +759,7 @@ export default function HomePage() {
                       onClick={() => {
                         setStep(2)
                         setError("")
+                        resetConnectionFeedback()
                       }}
                       className="px-6 py-3 bg-primary text-primary-foreground rounded-lg font-medium hover:bg-primary/90 transition-colors"
                     >
